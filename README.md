@@ -266,3 +266,67 @@ Issues and PRs are welcome. Please run `cargo fmt` and `cargo clippy --target wa
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+---
+
+## 个人部署备份恢复指南
+
+### 自动备份
+
+本项目已配置自动备份到坚果云 WebDAV：
+- **备份时间**：每天 UTC 04:00（北京时间 12:00）
+- **存储位置**：坚果云 `/cfwarden/production/`
+- **保留天数**：30 天
+- **加密**：AES-256 加密
+
+### 恢复方法
+
+#### 情况一：误操作回滚（7 天内）
+
+Cloudflare D1 支持「时间旅行」：
+
+1. 打开 [D1 控制台](https://dash.cloudflare.com/)
+2. 点击数据库 → **Time Travel** 标签
+3. 选择时间点 → **Restore**
+
+#### 情况二：从备份恢复
+
+**步骤 1：下载备份**
+
+从坚果云 `/cfwarden/production/` 下载最新的 `.sql.gz.enc` 文件。
+
+**步骤 2：解密并解压**
+
+```powershell
+# 解密（替换为你的 BACKUP_ENCRYPTION_KEY）
+openssl enc -aes-256-cbc -d -pbkdf2 -in vault1_prod_xxx.sql.gz.enc -out backup.sql.gz -pass pass:"你的加密密钥"
+
+# 解压
+gunzip backup.sql.gz
+```
+
+**步骤 3：导入数据库**
+
+```powershell
+# 设置环境变量
+$env:CLOUDFLARE_API_TOKEN = "你的API_TOKEN"
+$env:CLOUDFLARE_ACCOUNT_ID = "你的Account_ID"
+
+# 导入
+npx wrangler d1 execute warden-db --remote --file=backup.sql
+```
+
+**步骤 4：重新部署（如需要）**
+
+在 GitHub Actions 页面手动触发 **Build** workflow。
+
+### 重要配置信息
+
+请妥善保存以下信息：
+
+| 项目 | 说明 |
+|------|------|
+| `BACKUP_ENCRYPTION_KEY` | GitHub Secret 中存储 |
+| `D1_DATABASE_ID` | GitHub Secret 中存储 |
+| `CLOUDFLARE_ACCOUNT_ID` | GitHub Secret 中存储 |
+| 坚果云备份路径 | `/cfwarden/production/` |
